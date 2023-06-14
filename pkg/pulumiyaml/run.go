@@ -1257,7 +1257,19 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		}
 		err = e.pulumiCtx.ReadResource(string(typ), k, pulumi.ID(id), untypedArgs(props), res.(pulumi.CustomResource), opts...)
 	} else {
-		err = e.pulumiCtx.RegisterResource(string(typ), k, untypedArgs(props), res, opts...)
+		if v.Type.Value == "kubernetes:apiextensions.k8s.io:CustomResource" {
+			apiVersion, ok := props["apiVersion"].(string)
+			if !ok {
+				e.errorf(kvp.Key, "Property apiVersion does not exist on 'kubernetes:apiextensions.k8s.io:CustomResource'")
+			}
+			kind, ok := props["kind"].(string)
+			if !ok {
+				e.errorf(kvp.Key, "Property kind does not exist on 'kubernetes:apiextensions.k8s.io:CustomResource'")
+			}
+			err = e.pulumiCtx.RegisterResource(fmt.Sprintf("kubernetes:%s:%s", apiVersion, kind), k, untypedArgs(props), res, opts...)
+		} else {
+			err = e.pulumiCtx.RegisterResource(string(typ), k, untypedArgs(props), res, opts...)
+		}
 	}
 	if err != nil {
 		e.error(kvp.Key, err.Error())
