@@ -1257,18 +1257,15 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		}
 		err = e.pulumiCtx.ReadResource(string(typ), k, pulumi.ID(id), untypedArgs(props), res.(pulumi.CustomResource), opts...)
 	} else {
-		switch v.Type.Value {
-		case "kubernetes:apiextensions.k8s.io:CustomResource":
-			// patch to deploy CustomResource (https://m-pipe.atlassian.net/browse/IACS-334)
-			customResourceType, err := resolveCustomResourceType(props)
+		// patch to deploy CustomResource (https://m-pipe.atlassian.net/browse/IACS-334)
+		if v.Type.Value == "kubernetes:apiextensions.k8s.io:CustomResource" {
+			typ, err = resolveCustomResourceType(props)
 			if err != nil {
 				e.errorf(kvp.Key, err.Error())
 				return nil, false
 			}
-			err = e.pulumiCtx.RegisterResource(customResourceType, k, untypedArgs(props), res, opts...)
-		default:
-			err = e.pulumiCtx.RegisterResource(string(typ), k, untypedArgs(props), res, opts...)
 		}
+		err = e.pulumiCtx.RegisterResource(string(typ), k, untypedArgs(props), res, opts...)
 	}
 	if err != nil {
 		e.error(kvp.Key, err.Error())
@@ -1278,7 +1275,7 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	return state, true
 }
 
-func resolveCustomResourceType(props map[string]interface{}) (string, error) {
+func resolveCustomResourceType(props map[string]interface{}) (ResourceTypeToken, error) {
 	apiVersion, ok := props["apiVersion"].(string)
 	if !ok {
 		return "", fmt.Errorf("Property apiVersion does not exist on 'kubernetes:apiextensions.k8s.io:CustomResource'")
@@ -1287,7 +1284,7 @@ func resolveCustomResourceType(props map[string]interface{}) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("Property kind does not exist on 'kubernetes:apiextensions.k8s.io:CustomResource'")
 	}
-	return fmt.Sprintf("kubernetes:%s:%s", apiVersion, kind), nil
+	return ResourceTypeToken(fmt.Sprintf("kubernetes:%s:%s", apiVersion, kind)), nil
 }
 
 func (e *programEvaluator) evaluateResourceListValuedOption(optionExpr ast.Expr, key string) ([]lateboundResource, bool) {
