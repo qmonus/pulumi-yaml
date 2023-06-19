@@ -1257,17 +1257,16 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		}
 		err = e.pulumiCtx.ReadResource(string(typ), k, pulumi.ID(id), untypedArgs(props), res.(pulumi.CustomResource), opts...)
 	} else {
-		if v.Type.Value == "kubernetes:apiextensions.k8s.io:CustomResource" {
-			apiVersion, ok := props["apiVersion"].(string)
-			if !ok {
-				e.errorf(kvp.Key, "Property apiVersion does not exist on 'kubernetes:apiextensions.k8s.io:CustomResource'")
+		switch v.Type.Value {
+		case "kubernetes:apiextensions.k8s.io:CustomResource":
+			// patch to deploy CustomResource (https://m-pipe.atlassian.net/browse/IACS-334)
+			customResourceType, err := resolveCustomResourceType(props)
+			if err != nil {
+				e.errorf(kvp.Key, err.Error())
+				return nil, false
 			}
-			kind, ok := props["kind"].(string)
-			if !ok {
-				e.errorf(kvp.Key, "Property kind does not exist on 'kubernetes:apiextensions.k8s.io:CustomResource'")
-			}
-			err = e.pulumiCtx.RegisterResource(fmt.Sprintf("kubernetes:%s:%s", apiVersion, kind), k, untypedArgs(props), res, opts...)
-		} else {
+			err = e.pulumiCtx.RegisterResource(customResourceType, k, untypedArgs(props), res, opts...)
+		default:
 			err = e.pulumiCtx.RegisterResource(string(typ), k, untypedArgs(props), res, opts...)
 		}
 	}
@@ -1277,6 +1276,18 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	}
 
 	return state, true
+}
+
+func resolveCustomResourceType(props map[string]interface{}) (string, error) {
+	apiVersion, ok := props["apiVersion"].(string)
+	if !ok {
+		return "", fmt.Errorf("Property apiVersion does not exist on 'kubernetes:apiextensions.k8s.io:CustomResource'")
+	}
+	kind, ok := props["kind"].(string)
+	if !ok {
+		return "", fmt.Errorf("Property kind does not exist on 'kubernetes:apiextensions.k8s.io:CustomResource'")
+	}
+	return fmt.Sprintf("kubernetes:%s:%s", apiVersion, kind), nil
 }
 
 func (e *programEvaluator) evaluateResourceListValuedOption(optionExpr ast.Expr, key string) ([]lateboundResource, bool) {
