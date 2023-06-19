@@ -601,7 +601,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		)
 	}
 
-	_, skipCheckProps := skipCheckPropsResourceNames[typ.String()]
+	skipCheckProps := skipCheckPropsResourceNames[typ.String()]
 
 	// We type check properties if
 	// 1. They exist, or
