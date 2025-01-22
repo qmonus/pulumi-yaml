@@ -21,6 +21,10 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
+var skipCheckPropsResourceNames = map[string]bool{
+	"kubernetes:apiextensions.k8s.io:CustomResource": true,
+}
+
 // Query the typing of a typed program.
 //
 // If the program failed to establish the type of a variable, then `*schema.InvalidType`
@@ -616,10 +620,12 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		)
 	}
 
+	skipCheckProps := skipCheckPropsResourceNames[typ.String()]
+
 	// We type check properties if
 	// 1. They exist, or
 	// 2. The resource doesn't have a `Get` field (catching missing properties)
-	if resourceHasProperties || !resourceIsGet {
+	if (resourceHasProperties || !resourceIsGet) && !skipCheckProps {
 		tc.typePropertyEntries(ctx, k, typ.String(), fmtr, v.Properties.Entries, hint.Resource.InputProperties)
 	}
 
