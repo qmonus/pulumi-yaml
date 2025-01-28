@@ -273,6 +273,8 @@ var docker3ResourceNames = map[string]struct{}{
 }
 
 var kubernetesResourceNames = map[string]string{
+	// Prevent errors with custom resource types that are not supported in YAML by commenting them out.
+	// JIRA: https://m-pipe.atlassian.net/browse/IACS-334
 	// "kubernetes:apiextensions.k8s.io:CustomResource": "https://github.com/pulumi/pulumi-kubernetes/issues/1971",
 	"kubernetes:kustomize:Directory": "https://github.com/pulumi/pulumi-kubernetes/issues/1971",
 	"kubernetes:yaml:ConfigFile":     "https://github.com/pulumi/pulumi-kubernetes/issues/1971",
