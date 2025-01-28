@@ -1500,6 +1500,16 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 			res.(pulumi.CustomResource),
 			opts...)
 	} else {
+		// If the resource is a CustomResource, overwrite the type to match the format used by the Pulumi Kubernetes provider.
+		// JIRA: https://m-pipe.atlassian.net/browse/IACS-334
+		if v.Type.Value == "kubernetes:apiextensions.k8s.io:CustomResource" {
+			typ, err = resolveCustomResourceType(props)
+			if err != nil {
+				e.errorf(kvp.Key, err.Error())
+				return nil, false
+			}
+		}
+
 		typ := tokens.Type(typ)
 		packageRef := e.packageRefs[typ.Package()]
 		err = e.pulumiCtx.RegisterPackageResource(string(typ), resourceName, untypedArgs(props), res, packageRef, opts...)
@@ -1510,6 +1520,22 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	}
 
 	return state, true
+}
+
+// resolveCustomResourceType constructs the type for a Kubernetes CustomResource.
+// The type is formatted as "kubernetes:<apiVersion>:<kind>", which is used by the Pulumi Kubernetes provider.
+// See: https://github.com/pulumi/pulumi-kubernetes/blob/v3.25.0/sdk/nodejs/apiextensions/customResource.ts#L91
+// JIRA: https://m-pipe.atlassian.net/browse/IACS-334
+func resolveCustomResourceType(props map[string]interface{}) (ResourceTypeToken, error) {
+	apiVersion, ok := props["apiVersion"].(string)
+	if !ok {
+		return "", fmt.Errorf("Property apiVersion does not exist on 'kubernetes:apiextensions.k8s.io:CustomResource'")
+	}
+	kind, ok := props["kind"].(string)
+	if !ok {
+		return "", fmt.Errorf("Property kind does not exist on 'kubernetes:apiextensions.k8s.io:CustomResource'")
+	}
+	return ResourceTypeToken(fmt.Sprintf("kubernetes:%s:%s", apiVersion, kind)), nil
 }
 
 func (e *programEvaluator) evaluateResourceListValuedOption(optionExpr ast.Expr, key string) ([]lateboundResource, bool) {
